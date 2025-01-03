@@ -1,0 +1,21 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Map } from '../components/react/Map';
+import { WikipediaOverlay } from '../components/react/WikipediaOverlay';
+---
+
+<Layout>
+	<div class="min-h-screen bg-background dark:bg-background">
+		<div class="relative h-screen">
+			<Map client:only="react" />
+			<WikipediaOverlay client:only="react" />
+		</div>
+	</div>
+</Layout>
+
+<script>
+	// Ensure dark mode class is applied if needed
+	if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+		document.documentElement.classList.add('dark')
+	}
+</script>
