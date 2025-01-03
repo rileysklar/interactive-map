@@ -1,42 +1,86 @@
-# Project Plan: Interactive Map with React, Tailwind, Tailwind-Motion, and Astro
+# Project Plan: Interactive Map with React, Tailwind, and Astro
 
-## Step 1: Set Up Project
-- [ ] Install Node.js and npm.
-- [ ] Create a new Astro project: `npm create astro@latest interactive-map`.
-- [ ] Install dependencies:
-  - React, Tailwind CSS, Tailwind Motion, Leaflet, Axios: `npm install @astrojs/react react react-dom tailwindcss @tailwindcss/forms @tailwindcss/typography tailwind-motion leaflet axios`.
+## ✅ Completed Steps
 
-## Step 2: Configure Astro and Tailwind CSS
-- [ ] Add React integration in `astro.config.mjs`.
-- [ ] Configure Tailwind in `tailwind.config.js`:
-  - Include `@tailwindcss/forms`, `@tailwindcss/typography`.
-  - Update `content` paths to include Astro and React files.
-- [ ] Create `src/styles/global.css` and include Tailwind base, components, and utilities.
+### Step 1: Project Setup
+- [x] Install Node.js and npm
+- [x] Create new Astro project
+- [x] Install core dependencies (React, Tailwind, Leaflet)
+- [x] Add shadcn/ui components for modern UI
+- [x] Set up Git repository
+- [x] Create comprehensive README.md
+- [x] Set up feature branch for development
 
-## Step 3: Create React Components
-- [ ] Build `Map.jsx`:
-  - Use Leaflet for OpenStreetMap integration.
-  - Fetch and display event markers from an API.
-- [ ] Build `WikipediaOverlay.jsx`:
-  - Fetch Wikipedia articles using geolocation and display in a styled list.
+### Step 2: Configuration
+- [x] Configure Astro with React integration
+- [x] Set up Tailwind CSS
+- [x] Configure shadcn/ui components
 
-## Step 4: Integrate Components in Astro
-- [ ] Create an Astro page (e.g., `src/pages/index.astro`) and include React components.
-- [ ] Use Tailwind for responsive styling and layout.
+### Step 3: Core Features
+- [x] Implement OpenStreetMap with Leaflet
+- [x] Create Wikipedia article overlay
+- [x] Add location search functionality
+- [x] Implement bi-directional highlighting between map and dashboard
+- [x] Add category filtering for articles (Landmarks, Culture, History, Nature)
+- [x] Add article search functionality
+- [x] Add adjustable results limit (10-50 articles)
+- [x] Implement article card layout with distance and direction
+- [x] Add "Read More" links to full Wikipedia articles
 
-## Step 5: Set Up Backend API
-- [ ] Create a simple API for events (e.g., Node.js/Express or a static JSON file).
-- [ ] Serve event data at `/api/events`.
+## 🚧 In Progress
 
-## Step 6: Add Tailwind Motion
-- [ ] Use `tailwind-motion` for animations (e.g., transitions for markers or overlays).
-- [ ] Define motion variants and animate entry/exit of elements.
+### Step 4: UX Improvements
+- [ ] Add marker clustering for dense areas
+- [ ] Add loading states for API calls
+- [ ] Improve error handling for failed API calls
+- [ ] Add tooltips for UI controls
+- [ ] Implement proper mobile responsiveness
 
-## Step 7: Test and Deploy
-- [ ] Test locally: `npm run dev`.
-- [ ] Deploy to a hosting platform (e.g., Vercel or Netlify).
+### Step 5: Feature Enhancements
+- [ ] Implement article bookmarking
+- [ ] Add share functionality for locations
+- [ ] Create article history/recently viewed
+- [ ] Add radius visualization on map
+- [ ] Implement custom markers for different categories
 
-## Step 8: Enhance and Maintain
-- [ ] Add clustering for map markers (e.g., `leaflet.markercluster`).
-- [ ] Implement user geolocation search.
-- [ ] Regularly update API data and Wikipedia fetch logic.
+## 🆕 Future Features
+
+### UI/UX Improvements
+1. **Dashboard Layout**
+   - Add collapsible sidebar for mobile view
+   - Implement dark/light mode toggle
+   - Add mini-map view in dashboard for context
+
+2. **Map Interactions**
+   - Add zoom controls with category clustering
+   - Implement hover states for markers
+
+3. **Article Management**
+   - Add "Save for later" functionality
+   - Implement article collections/lists
+   - Add article rating/relevance sorting
+
+4. **Search Enhancements**
+   - Add search history
+   - Implement autocomplete for location search
+   - Add category-based quick filters
+
+### Technical Improvements
+1. **Performance**
+   - Implement article caching
+   - Add progressive loading for articles
+   - Optimize marker rendering
+
+2. **Data Management**
+   - Add local storage for user preferences
+   - Implement session history
+   - Add offline support for viewed articles
+
+## Priority Next Steps
+1. Implement marker clustering (current feature branch)
+2. Add loading states and error handling
+3. Improve mobile responsiveness
+4. Add radius visualization
+5. Implement custom category markers
+
+Would you like to start working on any of these next steps?

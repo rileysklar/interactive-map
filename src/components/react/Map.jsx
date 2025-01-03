@@ -5,6 +5,7 @@ export const Map = () => {
   const mapRef = useRef(null);
   const mapContainerRef = useRef(null);
   const markersRef = useRef({});
+  const radiusCircleRef = useRef(null);
 
   const addArticleMarkers = (articles) => {
     if (!mapRef.current || !window.L) return;
@@ -13,12 +14,29 @@ export const Map = () => {
     Object.values(markersRef.current).forEach(marker => marker.remove());
     markersRef.current = {};
 
+    // Clear existing radius circle
+    if (radiusCircleRef.current) {
+      radiusCircleRef.current.remove();
+    }
+
+    // Add new markers
     articles.forEach(article => {
       const marker = window.L.marker([article.lat, article.lon])
         .bindPopup(`
           <div class="p-2">
-            <h3 class="font-medium">${article.title}</h3>
-            <p class="text-sm">${Math.round(article.dist)}m away</p>
+            <h3 class="font-medium mb-2">${article.title}</h3>
+            ${article.thumbnail ? 
+              `<img src="${article.thumbnail}" alt="${article.title}" class="w-full h-32 object-cover rounded mb-2"/>` 
+              : ''}
+            <p class="text-sm mb-2">${article.extract?.substring(0, 100)}...</p>
+            <div class="flex justify-between items-center text-xs text-muted-foreground">
+              <span>📍 ${Math.round(article.dist)}m away</span>
+              <a href="https://en.wikipedia.org/?curid=${article.pageid}" 
+                 target="_blank" 
+                 class="text-blue-500 hover:text-blue-700">
+                Read More →
+              </a>
+            </div>
           </div>
         `)
         .addTo(mapRef.current);
@@ -31,6 +49,19 @@ export const Map = () => {
       
       markersRef.current[article.pageid] = marker;
     });
+
+    // If we have articles, draw radius circle around the search center
+    if (articles.length > 0) {
+      const center = mapRef.current.getCenter();
+      const radius = articles[0].searchRadius || 10000; // Use the radius from the API or default
+      radiusCircleRef.current = window.L.circle([center.lat, center.lng], {
+        radius: radius,
+        color: '#3b82f6',
+        fillColor: '#3b82f6',
+        fillOpacity: 0.1,
+        weight: 1
+      }).addTo(mapRef.current);
+    }
   };
 
   const highlightMarker = (pageid) => {
@@ -44,8 +75,13 @@ export const Map = () => {
   // Function to update map center
   const setMapCenter = (lat, lon, zoom = 13) => {
     if (mapRef.current) {
-      console.log('Setting map center to:', lat, lon); // Debug log
+      console.log('Setting map center to:', lat, lon);
       mapRef.current.setView([lat, lon], zoom);
+      
+      // Update radius circle position
+      if (radiusCircleRef.current) {
+        radiusCircleRef.current.setLatLng([lat, lon]);
+      }
     }
   };
 
