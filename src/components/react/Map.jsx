@@ -17,8 +17,14 @@ export const Map = () => {
       const marker = window.L.marker([article.lat, article.lon])
         .bindPopup(`
           <div class="p-2">
-            <h3 class="font-medium">${article.title}</h3>
-            <p class="text-sm">${Math.round(article.dist)}m away</p>
+            <h3 class="font-medium mb-2">${article.title}</h3>
+            ${article.thumbnail ? 
+              `<img src="${article.thumbnail}" alt="${article.title}" class="w-full h-32 object-cover rounded mb-2"/>` 
+              : ''}
+            <p class="text-sm mb-2">${article.extract?.substring(0, 100)}...</p>
+            <div class="text-xs text-muted-foreground">
+              <span>📍 ${Math.round(article.dist)}m away</span>
+            </div>
           </div>
         `)
         .addTo(mapRef.current);

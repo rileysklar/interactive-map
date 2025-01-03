@@ -7,16 +7,29 @@ import { Slider } from "../ui/slider";
 import { Search } from 'lucide-react';
 
 export const WikipediaOverlay = () => {
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
+
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [highlightedArticle, setHighlightedArticle] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [limit, setLimit] = useState(20);
-  const [sortBy, setSortBy] = useState('name');
   const [categories, setCategories] = useState(new Set());
   const [locationSearch, setLocationSearch] = useState('');
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const categorizeArticle = (articleCategories) => {
     const groups = {
@@ -53,23 +66,35 @@ export const WikipediaOverlay = () => {
   const fetchNearbyArticles = async (lat, lon) => {
     try {
       setLoading(true);
-      console.log('Fetching articles for:', lat, lon, 'with limit:', limit); // Debug log
+      
+      // Define category mappings
+      const categoryMappings = {
+        landmarks: 'Category:Buildings_and_structures|Category:Monuments_and_memorials|Category:Architecture',
+        culture: 'Category:Museums|Category:Cultural_venues|Category:Arts_organizations|Category:Entertainment_venues',
+        history: 'Category:Historic_sites|Category:History|Category:Heritage_sites|Category:Archaeological_sites',
+        nature: 'Category:Parks|Category:Gardens|Category:Natural_features|Category:Geography'
+      };
 
-      // Initial API call to get nearby articles using current limit
-      const geoUrl = `https://en.wikipedia.org/w/api.php?` + 
-        new URLSearchParams({
-          action: 'query',
-          list: 'geosearch',
-          gscoord: `${lat}|${lon}`,
-          gsradius: '10000', // 10km radius
-          gslimit: limit.toString(), // Use the current limit value
-          format: 'json',
-          origin: '*'
-        });
+      // Build API URL with category filter if not "all"
+      const params = {
+        action: 'query',
+        list: 'geosearch',
+        gscoord: `${lat}|${lon}`,
+        gsradius: '10000',
+        gslimit: limit.toString(),
+        format: 'json',
+        origin: '*'
+      };
+
+      // Add category filter if a specific category is selected
+      if (selectedCategory !== 'all' && categoryMappings[selectedCategory]) {
+        params.gscategories = categoryMappings[selectedCategory];
+      }
+
+      const geoUrl = `https://en.wikipedia.org/w/api.php?${new URLSearchParams(params)}`;
 
       const response = await fetch(geoUrl);
       const data = await response.json();
-      console.log('Wikipedia API response:', data); // Debug log
 
       if (data.query && data.query.geosearch) {
         const articlesWithDetails = await Promise.all(
@@ -78,9 +103,11 @@ export const WikipediaOverlay = () => {
               new URLSearchParams({
                 action: 'query',
                 pageids: place.pageid,
-                prop: 'extracts|categories',
+                prop: 'extracts|categories|pageimages',
                 exintro: '1',
                 explaintext: '1',
+                piprop: 'thumbnail',
+                pithumbsize: 200,
                 format: 'json',
                 origin: '*'
               });
@@ -94,15 +121,13 @@ export const WikipediaOverlay = () => {
               title: page.title,
               extract: page.extract,
               categories: page.categories?.map(cat => cat.title.replace('Category:', '')) || [],
-              direction: getDirection(lat, lon, place.lat, place.lon)
+              direction: getDirection(lat, lon, place.lat, place.lon),
+              thumbnail: page.thumbnail?.source || null
             };
           })
         );
 
-        console.log('Processed articles:', articlesWithDetails.length); // Debug log
         setArticles(articlesWithDetails);
-        
-        // Update map markers
         if (window.addArticleMarkers) {
           window.addArticleMarkers(articlesWithDetails);
         }
@@ -140,23 +165,8 @@ export const WikipediaOverlay = () => {
       );
     }
 
-    return filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name':
-          return a.title.localeCompare(b.title);
-        case 'relevance':
-          if (searchTerm) {
-            const aTitle = a.title.toLowerCase();
-            const bTitle = b.title.toLowerCase();
-            const searchLower = searchTerm.toLowerCase();
-            return (aTitle.includes(searchLower) && !bTitle.includes(searchLower)) ? -1 : 1;
-          }
-          return 0;
-        default:
-          return 0;
-      }
-    });
-  }, [articles, searchTerm, sortBy]);
+    return filtered;
+  }, [articles, searchTerm]);
 
   useEffect(() => {
     const handleMarkerClick = (e) => {
@@ -225,26 +235,90 @@ export const WikipediaOverlay = () => {
     }
   };
 
-  const requestLocation = () => {
-    setLoading(true);
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newLocation = {
-            lat: position.coords.latitude,
-            lon: position.coords.longitude
-          };
-          setCurrentLocation(newLocation);
-          fetchNearbyArticles(newLocation.lat, newLocation.lon);
-          if (window.setMapCenter) {
-            window.setMapCenter(newLocation.lat, newLocation.lon);
-          }
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          setLoading(false);
+  const searchWikipedia = async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const searchUrl = `https://en.wikipedia.org/w/api.php?` +
+        new URLSearchParams({
+          action: 'opensearch',
+          search: searchTerm,
+          limit: '10',
+          namespace: '0',
+          format: 'json',
+          origin: '*'
+        });
+
+      const response = await fetch(searchUrl);
+      const [term, titles, descriptions, urls] = await response.json();
+      
+      const results = titles.map((title, index) => ({
+        title,
+        description: descriptions[index],
+        url: urls[index]
+      }));
+
+      setSearchResults(results);
+    } catch (error) {
+      console.error('Error searching Wikipedia:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const debouncedSearch = React.useCallback(
+    debounce((term) => searchWikipedia(term), 300),
+    []
+  );
+
+  const fetchArticleLocation = async (title) => {
+    try {
+      setLoading(true);
+      const geoUrl = `https://en.wikipedia.org/w/api.php?` + 
+        new URLSearchParams({
+          action: 'query',
+          titles: title,
+          prop: 'coordinates|extracts|categories|pageimages',
+          exintro: '1',
+          explaintext: '1',
+          piprop: 'thumbnail',
+          pithumbsize: 200,
+          format: 'json',
+          origin: '*'
+        });
+
+      const response = await fetch(geoUrl);
+      const data = await response.json();
+      const page = Object.values(data.query.pages)[0];
+      
+      if (page.coordinates) {
+        const { lat, lon } = page.coordinates[0];
+        
+        // Update location first
+        setCurrentLocation({ lat, lon });
+        
+        // Update map center
+        if (window.setMapCenter) {
+          window.setMapCenter(lat, lon, 15);
         }
-      );
+
+        // Fetch nearby articles immediately
+        await fetchNearbyArticles(lat, lon);
+
+        // Highlight the searched article after nearby articles are loaded
+        setHighlightedArticle(page.pageid);
+        if (window.highlightMarker) {
+          window.highlightMarker(page.pageid);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching article location:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -252,7 +326,7 @@ export const WikipediaOverlay = () => {
     <Card className="fixed right-4 top-4 w-96 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 max-h-[90vh] overflow-hidden z-[1000]">
       <CardHeader className="border-b space-y-4">
         <div className="flex items-center justify-between">
-          <CardTitle>Nearby Places</CardTitle>
+          <CardTitle>WikiMaps 🌎</CardTitle>
           <Button 
             variant="outline" 
             size="icon"
@@ -280,12 +354,16 @@ export const WikipediaOverlay = () => {
 
         <div className="flex gap-2 mb-2">
           <div className="relative flex-1">
+          <label className="text-xs font-medium mb-1 block">
+            Lcoation Search
+          </label>
             <Input
-              placeholder="Search location..."
+              placeholder="e.g., 'Eiffel Tower' or 'Times Square, NYC'"
               value={locationSearch}
               onChange={(e) => setLocationSearch(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
+                  e.preventDefault();
                   searchLocation(locationSearch);
                 }
               }}
@@ -294,59 +372,74 @@ export const WikipediaOverlay = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-0 top-0 h-full"
+              className="absolute right-0 top-[28px] h-[calc(100%-28px)]"
               onClick={() => searchLocation(locationSearch)}
             >
               <Search className="h-4 w-4" />
             </Button>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={requestLocation}
-            title="Use my location"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2" />
-              <path d="M12 20v2" />
-              <path d="M2 12h2" />
-              <path d="M20 12h2" />
-            </svg>
-          </Button>
         </div>
 
-        <Input
-          placeholder="Search articles..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full"
-        />
+        <div className="relative">
+          <label className="text-xs font-medium mb-1 block">
+            Article Search
+          </label>
+          <Input
+            placeholder="e.g., 'Statue of Liberty' or 'Big Ben'"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              debouncedSearch(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && searchResults.length > 0) {
+                e.preventDefault();
+                fetchArticleLocation(searchResults[0].title);
+                setSearchResults([]);
+                setSearchTerm('');
+              }
+            }}
+            className="w-full"
+          />
+          {isSearching && (
+            <div className="absolute right-2 top-[calc(50%+14px)] transform -translate-y-1/2">
+              <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          )}
+          
+          {searchResults.length > 0 && searchTerm && (
+            <Card className="absolute w-full mt-1 z-50 max-h-[300px] overflow-auto">
+              <CardContent className="p-2">
+                {searchResults.map((result, index) => (
+                  <div
+                    key={index}
+                    className="p-2 hover:bg-accent cursor-pointer rounded"
+                    onClick={() => {
+                      fetchArticleLocation(result.title);
+                      setSearchResults([]); // Clear search results
+                      setSearchTerm(''); // Clear search input
+                    }}
+                  >
+                    <h4 className="font-medium">{result.title}</h4>
+                    {result.description && (
+                      <p className="text-sm text-muted-foreground">
+                        {result.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2"><label className="text-xs font-medium mb-1 block">
+            Category
+          </label>
           <div className="flex gap-2">
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sort by..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="relevance">Relevance</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-[180px]">
+          
+            <Select value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
+              <SelectTrigger>
                 <SelectValue placeholder="Filter by..." />
               </SelectTrigger>
               <SelectContent className="z-[1001]">
@@ -373,12 +466,12 @@ export const WikipediaOverlay = () => {
               value={[limit]}
               onValueChange={([value]) => {
                 setLimit(value);
-                setLoading(true); // Show loading state while fetching new results
+                setLoading(true);
               }}
               min={10}
               max={50}
               step={5}
-              disabled={loading} // Disable slider while loading
+              disabled={loading}
             />
           </div>
         </div>
@@ -387,10 +480,7 @@ export const WikipediaOverlay = () => {
       <CardContent className="overflow-auto max-h-[calc(90vh-120px)]">
         {!currentLocation ? (
           <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-            <p className="mb-4">Search for a location or use your current location to see nearby Wikipedia articles</p>
-            <Button onClick={requestLocation}>
-              Use My Location
-            </Button>
+            <p className="mb-4">Search for a location to see nearby Wikipedia articles</p>
           </div>
         ) : loading ? (
           <div className="flex justify-center p-4">
@@ -412,8 +502,17 @@ export const WikipediaOverlay = () => {
                   }
                 }}
               >
-                <div className="flex items-start justify-between">
-                  <div>
+                <div className="flex items-start gap-4">
+                  {article.thumbnail && (
+                    <div className="flex-shrink-0 w-24 h-24">
+                      <img 
+                        src={article.thumbnail} 
+                        alt={article.title}
+                        className="w-full h-full object-cover rounded"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1">
                     <h3 className="font-medium mb-1">{article.title}</h3>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary">
@@ -429,7 +528,10 @@ export const WikipediaOverlay = () => {
                   <Button 
                     variant="link" 
                     className="text-sm"
-                    onClick={() => window.open(`https://en.wikipedia.org/?curid=${article.pageid}`, '_blank')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(`https://en.wikipedia.org/?curid=${article.pageid}`, '_blank');
+                    }}
                   >
                     Read More →
                   </Button>

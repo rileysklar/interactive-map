@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 
+interface WikiArticle {
+  pageid: number;
+  title: string;
+  extract?: string;
+  dist: number;
+  lat: number;
+  lon: number;
+}
+
 export const WikipediaOverlay = () => {
-  const [articles, setArticles] = useState([]);
+  const [articles, setArticles] = useState<WikiArticle[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchNearbyArticles = async (lat, lon) => {
